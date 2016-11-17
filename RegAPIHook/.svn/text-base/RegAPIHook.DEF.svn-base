@@ -1,0 +1,4 @@
+LIBRARY RegAPIHook.DLL
+EXPORTS
+	InjectHook
+	EjectHook
