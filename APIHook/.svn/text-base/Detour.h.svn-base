@@ -1,0 +1,11 @@
+#ifndef DETOUR_H
+#define DETOUR_H
+
+#ifdef WIN32
+#include <windows.h>
+
+extern "C" PROC DetourFunction(PROC target, PROC detour);
+extern "C" void DetourRemove(PROC trampline);
+#endif
+
+#endif
