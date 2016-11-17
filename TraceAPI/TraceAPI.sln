@@ -1,0 +1,38 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 9.00
+# Visual Studio 2005
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TraceAPI", "TraceAPI.vcproj", "{71C387FA-ED64-40DC-94F1-4C9928487734}"
+	ProjectSection(ProjectDependencies) = postProject
+		{F64B1353-D102-47C3-A333-729849FD8400} = {F64B1353-D102-47C3-A333-729849FD8400}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "RegAPIHook", "..\RegAPIHook\RegAPIHook.vcproj", "{F64B1353-D102-47C3-A333-729849FD8400}"
+	ProjectSection(ProjectDependencies) = postProject
+		{E5B11EB2-E1DE-48E6-9D24-C41F3B9F406C} = {E5B11EB2-E1DE-48E6-9D24-C41F3B9F406C}
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "APIHook", "..\APIHook\APIHook.vcproj", "{E5B11EB2-E1DE-48E6-9D24-C41F3B9F406C}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Win32 = Debug|Win32
+		Release|Win32 = Release|Win32
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{71C387FA-ED64-40DC-94F1-4C9928487734}.Debug|Win32.ActiveCfg = Debug|Win32
+		{71C387FA-ED64-40DC-94F1-4C9928487734}.Debug|Win32.Build.0 = Debug|Win32
+		{71C387FA-ED64-40DC-94F1-4C9928487734}.Release|Win32.ActiveCfg = Release|Win32
+		{71C387FA-ED64-40DC-94F1-4C9928487734}.Release|Win32.Build.0 = Release|Win32
+		{F64B1353-D102-47C3-A333-729849FD8400}.Debug|Win32.ActiveCfg = Debug|Win32
+		{F64B1353-D102-47C3-A333-729849FD8400}.Debug|Win32.Build.0 = Debug|Win32
+		{F64B1353-D102-47C3-A333-729849FD8400}.Release|Win32.ActiveCfg = Release|Win32
+		{F64B1353-D102-47C3-A333-729849FD8400}.Release|Win32.Build.0 = Release|Win32
+		{E5B11EB2-E1DE-48E6-9D24-C41F3B9F406C}.Debug|Win32.ActiveCfg = Debug|Win32
+		{E5B11EB2-E1DE-48E6-9D24-C41F3B9F406C}.Debug|Win32.Build.0 = Debug|Win32
+		{E5B11EB2-E1DE-48E6-9D24-C41F3B9F406C}.Release|Win32.ActiveCfg = Release|Win32
+		{E5B11EB2-E1DE-48E6-9D24-C41F3B9F406C}.Release|Win32.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal
