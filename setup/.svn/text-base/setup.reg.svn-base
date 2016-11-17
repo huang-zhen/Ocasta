@@ -1,7 +1,0 @@
-Windows Registry Editor Version 5.00 
-
-[HKEY_CURRENT_USER\Software\Sunbird\TraceAPI] 
-"Version"="1.0.0"
-"MainWindow"=dword:00000000 
-"APIDLL"="%USERPROFILE%\\TraceAPI\\RegAPIHook.DLL" 
-"LogPath"="%USERPROFILE%\\TraceAPI\\data\\RegAPIHook.LOG" 
