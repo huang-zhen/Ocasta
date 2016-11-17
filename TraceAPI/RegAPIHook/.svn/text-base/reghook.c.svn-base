@@ -1,0 +1,918 @@
+#define MAX_BUF_LEN 256
+
+#include "CWinLogRegAPI.h"
+
+static DWORD dwTlsIndex; // address of shared memory
+static CLogRegAPI *g_api;
+static DWORD g_procId;
+
+BOOL thread_attach()
+{
+	BOOL ret = FALSE;
+    LPVOID lpvData = (LPVOID) LocalAlloc(LPTR, MAX_BUF_LEN); 
+	if (lpvData != NULL) {
+        ret = TlsSetValue(dwTlsIndex, lpvData); 
+	}
+	//RegAPILog.print("thread %d attach %d->%p\n", GetCurrentThreadId(), dwTlsIndex, lpvData);
+	return ret;
+}
+
+void thread_detach()
+{
+    LPVOID lpvData = TlsGetValue(dwTlsIndex); 
+	//RegAPILog.print("thread %d detach %d->%p\n", GetCurrentThreadId(), dwTlsIndex, lpvData);
+	if (lpvData != NULL) 
+        LocalFree((HLOCAL) lpvData); 
+}
+
+BOOL process_attach()
+{
+	g_procId = GetCurrentProcessId();
+    g_api = new CWinLogRegAPI(1);
+	if ((dwTlsIndex = TlsAlloc()) == TLS_OUT_OF_INDEXES)
+		return FALSE;
+
+	return thread_attach();
+}
+
+void process_detach()
+{
+	if (g_api)
+		delete g_api;
+	thread_detach();
+    TlsFree(dwTlsIndex); 
+}
+
+static int ConvertFromWSTR(LPCWSTR lpWSTR, int wlen, LPSTR lpSTR, int len)
+{
+	return WideCharToMultiByte(CP_ACP, 0, lpWSTR, wlen, lpSTR, len, NULL, NULL);
+}
+
+// thread-safe wide-char to multi-char conversion
+static const char* WSTR2STR(LPCWSTR wstr)
+{ 
+	char *lpSTR = NULL;
+	lpSTR = (char *)TlsGetValue(dwTlsIndex);
+
+	if (!wstr) {
+		//RegAPILog.print("ERROR: thread:%d WSTR2STR(NULL)\n", GetCurrentThreadId());
+		return NULL;
+	}
+
+	if (!lpSTR) {
+		if (thread_attach())
+			lpSTR = (char *)TlsGetValue(dwTlsIndex);
+		else
+			RegAPILog.print("ERROR: thread:%d attach failed\n", GetCurrentThreadId());
+	}
+
+	ConvertFromWSTR(wstr, -1, lpSTR, MAX_BUF_LEN);
+
+	return lpSTR;
+}
+
+/*
+ * Hook handles
+ */
+DWORD Hook_hRegCloseKey;
+
+DWORD Hook_hRegConnectRegistryA;
+
+DWORD Hook_hRegConnectRegistryW;
+
+DWORD Hook_hRegCreateKeyExA;
+
+DWORD Hook_hRegCreateKeyExW;
+
+DWORD Hook_hRegDeleteKeyA;
+
+DWORD Hook_hRegDeleteKeyW;
+
+DWORD Hook_hRegDeleteKeyExA;
+
+DWORD Hook_hRegDeleteKeyExW;
+
+DWORD Hook_hRegDeleteValueA;
+
+DWORD Hook_hRegDeleteValueW;
+
+DWORD Hook_hRegDisablePredefinedCache;
+
+DWORD Hook_hRegDisableReflectionKey;
+
+DWORD Hook_hRegEnableReflectionKey;
+
+DWORD Hook_hRegEnumKeyEx;
+
+DWORD Hook_hRegEnumValue;
+
+DWORD Hook_hRegFlushKey;
+
+DWORD Hook_hRegGetKeySecurity;
+
+DWORD Hook_hRegGetValueA;
+
+DWORD Hook_hRegGetValueW;
+
+DWORD Hook_hRegLoadKeyA;
+
+DWORD Hook_hRegLoadKeyW;
+
+DWORD Hook_hRegNotifyChangeKeyValue;
+
+DWORD Hook_hRegOpenCurrentUser;
+
+DWORD Hook_hRegOpenKeyExA;
+
+DWORD Hook_hRegOpenKeyExW;
+
+DWORD Hook_hRegOpenUserClassesRoot;
+
+DWORD Hook_hRegOverridePredefKey;
+
+DWORD Hook_hRegQueryInfoKey;
+
+DWORD Hook_hRegQueryMultipleValues;
+
+DWORD Hook_hRegQueryReflectionKey;
+
+DWORD Hook_hRegQueryValueExA;
+
+DWORD Hook_hRegQueryValueExW;
+
+DWORD Hook_hRegReplaceKeyA;
+
+DWORD Hook_hRegReplaceKeyW;
+
+DWORD Hook_hRegRestoreKeyA;
+
+DWORD Hook_hRegRestoreKeyW;
+
+DWORD Hook_hRegSaveKeyA;
+
+DWORD Hook_hRegSaveKeyW;
+
+DWORD Hook_hRegSaveKeyExA;
+
+DWORD Hook_hRegSaveKeyExW;
+
+DWORD Hook_hRegSetKeySecurity;
+
+DWORD Hook_hRegSetValueExA;
+
+DWORD Hook_hRegSetValueExW;
+
+DWORD Hook_hRegUnLoadKeyA;
+
+DWORD Hook_hRegUnLoadKeyW;
+
+
+/*
+ * Original function entries
+ */
+ LONG (WINAPI *Orig_RegCloseKey)(HKEY hKey);
+
+ LONG (WINAPI *Orig_RegConnectRegistryA)(LPCSTR lpMachineName, HKEY hKey, PHKEY phkResult);
+
+ LONG (WINAPI *Orig_RegConnectRegistryW)(LPCWSTR lpMachineName, HKEY hKey, PHKEY phkResult);
+
+ LONG (WINAPI *Orig_RegCreateKeyExA)(HKEY hKey, LPCSTR lpSubKey, DWORD Reserved, LPTSTR lpClass, DWORD dwOptions, REGSAM samDesired, LPSECURITY_ATTRIBUTES lpSecurityAttributes, PHKEY phkResult, LPDWORD lpdwDisposition);
+
+ LONG (WINAPI *Orig_RegCreateKeyExW)(HKEY hKey, LPCWSTR lpSubKey, DWORD Reserved, LPTSTR lpClass, DWORD dwOptions, REGSAM samDesired, LPSECURITY_ATTRIBUTES lpSecurityAttributes, PHKEY phkResult, LPDWORD lpdwDisposition);
+
+ LONG (WINAPI *Orig_RegDeleteKeyA)(HKEY hKey, LPCSTR lpSubKey);
+
+ LONG (WINAPI *Orig_RegDeleteKeyW)(HKEY hKey, LPCWSTR lpSubKey);
+
+ LONG (WINAPI *Orig_RegDeleteKeyExA)(HKEY hKey, LPCSTR lpSubKey, REGSAM samDesired, DWORD Reserved);
+
+ LONG (WINAPI *Orig_RegDeleteKeyExW)(HKEY hKey, LPCWSTR lpSubKey, REGSAM samDesired, DWORD Reserved);
+
+ LONG (WINAPI *Orig_RegDeleteValueA)(HKEY hKey, LPCSTR lpValueName);
+
+ LONG (WINAPI *Orig_RegDeleteValueW)(HKEY hKey, LPCWSTR lpValueName);
+
+ LONG (WINAPI *Orig_RegDisablePredefinedCache)();
+
+ LONG (WINAPI *Orig_RegDisableReflectionKey)(HKEY hBase);
+
+ LONG (WINAPI *Orig_RegEnableReflectionKey)(HKEY hBase);
+
+ LONG (WINAPI *Orig_RegEnumKeyEx)(HKEY hKey, DWORD dwIndex, LPTSTR lpName, LPDWORD lpcName, LPDWORD lpReserved, LPTSTR lpClass, LPDWORD lpcClass, PFILETIME lpftLastWriteTime);
+
+ LONG (WINAPI *Orig_RegEnumValue)(HKEY hKey, DWORD dwIndex, LPTSTR lpValueName, LPDWORD lpcValueName, LPDWORD lpReserved, LPDWORD lpType, LPBYTE lpData, LPDWORD lpcbData);
+
+ LONG (WINAPI *Orig_RegFlushKey)(HKEY hKey);
+
+ LONG (WINAPI *Orig_RegGetKeySecurity)(HKEY hKey, SECURITY_INFORMATION SecurityInformation, PSECURITY_DESCRIPTOR pSecurityDescriptor, LPDWORD lpcbSecurityDescriptor);
+
+ LONG (WINAPI *Orig_RegGetValueA)(HKEY hkey, LPCSTR lpSubKey, LPCSTR lpValue, DWORD dwFlags, LPDWORD pdwType, PVOID pvData, LPDWORD pcbData);
+
+ LONG (WINAPI *Orig_RegGetValueW)(HKEY hkey, LPCWSTR lpSubKey, LPCWSTR lpValue, DWORD dwFlags, LPDWORD pdwType, PVOID pvData, LPDWORD pcbData);
+
+ LONG (WINAPI *Orig_RegLoadKeyA)(HKEY hKey, LPCSTR lpSubKey, LPCSTR lpFile);
+
+ LONG (WINAPI *Orig_RegLoadKeyW)(HKEY hKey, LPCWSTR lpSubKey, LPCWSTR lpFile);
+
+ LONG (WINAPI *Orig_RegNotifyChangeKeyValue)(HKEY hKey, BOOL bWatchSubtree, DWORD dwNotifyFilter, HANDLE hEvent, BOOL fAsynchronous);
+
+ LONG (WINAPI *Orig_RegOpenCurrentUser)(REGSAM samDesired, PHKEY phkResult);
+
+ LONG (WINAPI *Orig_RegOpenKeyExA)(HKEY hKey, LPCSTR lpSubKey, DWORD ulOptions, REGSAM samDesired, PHKEY phkResult);
+
+ LONG (WINAPI *Orig_RegOpenKeyExW)(HKEY hKey, LPCWSTR lpSubKey, DWORD ulOptions, REGSAM samDesired, PHKEY phkResult);
+
+ LONG (WINAPI *Orig_RegOpenUserClassesRoot)(HANDLE hToken, DWORD dwOptions, REGSAM samDesired, PHKEY phkResult);
+
+ LONG (WINAPI *Orig_RegOverridePredefKey)(HKEY hKey, HKEY hNewHKey);
+
+ LONG (WINAPI *Orig_RegQueryInfoKey)(HKEY hKey, LPTSTR lpClass, LPDWORD lpcClass, LPDWORD lpReserved, LPDWORD lpcSubKeys, LPDWORD lpcMaxSubKeyLen, LPDWORD lpcMaxClassLen, LPDWORD lpcValues, LPDWORD lpcMaxValueNameLen, LPDWORD lpcMaxValueLen, LPDWORD lpcbSecurityDescriptor, PFILETIME lpftLastWriteTime);
+
+ LONG (WINAPI *Orig_RegQueryMultipleValues)(HKEY hKey, PVALENT val_list, DWORD num_vals, LPTSTR lpValueBuf, LPDWORD ldwTotsize);
+
+ LONG (WINAPI *Orig_RegQueryReflectionKey)(HKEY hBase, BOOL bIsReflectionDisabled);
+
+ LONG (WINAPI *Orig_RegQueryValueExA)(HKEY hKey, LPCSTR lpValueName, LPDWORD lpReserved, LPDWORD lpType, LPBYTE lpData, LPDWORD lpcbData);
+
+ LONG (WINAPI *Orig_RegQueryValueExW)(HKEY hKey, LPCWSTR lpValueName, LPDWORD lpReserved, LPDWORD lpType, LPBYTE lpData, LPDWORD lpcbData);
+
+ LONG (WINAPI *Orig_RegReplaceKeyA)(HKEY hKey, LPCSTR lpSubKey, LPCSTR lpNewFile, LPCSTR lpOldFile);
+
+ LONG (WINAPI *Orig_RegReplaceKeyW)(HKEY hKey, LPCWSTR lpSubKey, LPCWSTR lpNewFile, LPCWSTR lpOldFile);
+
+ LONG (WINAPI *Orig_RegRestoreKeyA)(HKEY hKey, LPCSTR lpFile, DWORD dwFlags);
+
+ LONG (WINAPI *Orig_RegRestoreKeyW)(HKEY hKey, LPCWSTR lpFile, DWORD dwFlags);
+
+ LONG (WINAPI *Orig_RegSaveKeyA)(HKEY hKey, LPCSTR lpFile, LPSECURITY_ATTRIBUTES lpSecurityAttributes);
+
+ LONG (WINAPI *Orig_RegSaveKeyW)(HKEY hKey, LPCWSTR lpFile, LPSECURITY_ATTRIBUTES lpSecurityAttributes);
+
+ LONG (WINAPI *Orig_RegSaveKeyExA)(HKEY hKey, LPCSTR lpFile, LPSECURITY_ATTRIBUTES lpSecurityAttributes, DWORD Flags);
+
+ LONG (WINAPI *Orig_RegSaveKeyExW)(HKEY hKey, LPCWSTR lpFile, LPSECURITY_ATTRIBUTES lpSecurityAttributes, DWORD Flags);
+
+ LONG (WINAPI *Orig_RegSetKeySecurity)(HKEY hKey, SECURITY_INFORMATION SecurityInformation, PSECURITY_DESCRIPTOR pSecurityDescriptor);
+
+ LONG (WINAPI *Orig_RegSetValueExA)(HKEY hKey, LPCSTR lpValueName, DWORD Reserved, DWORD dwType, const BYTE* lpData, DWORD cbData);
+
+ LONG (WINAPI *Orig_RegSetValueExW)(HKEY hKey, LPCWSTR lpValueName, DWORD Reserved, DWORD dwType, const BYTE* lpData, DWORD cbData);
+
+ LONG (WINAPI *Orig_RegUnLoadKeyA)(HKEY hKey, LPCSTR lpSubKey);
+
+ LONG (WINAPI *Orig_RegUnLoadKeyW)(HKEY hKey, LPCWSTR lpSubKey);
+
+
+/*
+ * Hook functions
+ */
+ LONG WINAPI Hook_RegCloseKey(HKEY hKey) {
+	//char buf[MAX_BUF_LEN];
+	time_t t;
+	time(&t);
+	LONG ret = Orig_RegCloseKey(hKey);
+	//strncpy(buf, sizeof(buf), "RegCloseKey");
+	RegAPILog.print("RegCloseKey* %d %X\n", ret, hKey);
+	g_api->close_key(g_procId, (key_t)hKey, t, ret);
+	return ret;
+}
+
+ LONG WINAPI Hook_RegConnectRegistryA(LPCSTR lpMachineName, HKEY hKey, PHKEY phkResult) {
+	//char buf[MAX_BUF_LEN];
+
+	LONG ret = Orig_RegConnectRegistryA(lpMachineName, hKey, phkResult);
+	//strncpy(buf, sizeof(buf), "RegConnectRegistryA");
+	RegAPILog.print("RegConnectRegistryA %d \"%s\"%X %X\n", ret, lpMachineName, hKey, phkResult ? *phkResult : NULL);
+	return ret;
+}
+
+ LONG WINAPI Hook_RegConnectRegistryW(LPCWSTR lpMachineName, HKEY hKey, PHKEY phkResult) {
+	//char buf[MAX_BUF_LEN];
+
+	LONG ret = Orig_RegConnectRegistryW(lpMachineName, hKey, phkResult);
+	//strncpy(buf, sizeof(buf), "RegConnectRegistryW");
+	RegAPILog.print("RegConnectRegistryW %d \"%s\"%X %X\n", ret, WSTR2STR(lpMachineName), hKey, phkResult ? *phkResult : NULL);
+	return ret;
+}
+
+ LONG WINAPI Hook_RegCreateKeyExA(HKEY hKey, LPCSTR lpSubKey, DWORD Reserved, LPTSTR lpClass, DWORD dwOptions, REGSAM samDesired, LPSECURITY_ATTRIBUTES lpSecurityAttributes, PHKEY phkResult, LPDWORD lpdwDisposition) {
+	time_t t;
+	time(&t);
+
+	LONG ret = Orig_RegCreateKeyExA(hKey, lpSubKey, Reserved, lpClass, dwOptions, samDesired, lpSecurityAttributes, phkResult, lpdwDisposition);
+	RegAPILog.print("RegCreateKeyExA* %d %X \"%s\" %X\n", ret, hKey, lpSubKey, phkResult ? *phkResult : NULL);
+	g_api->create_key(g_procId, (key_t)hKey, lpSubKey, (key_t)(phkResult? *phkResult : NULL), t, ret);
+	return ret;
+}
+
+ LONG WINAPI Hook_RegCreateKeyExW(HKEY hKey, LPCWSTR lpSubKey, DWORD Reserved, LPTSTR lpClass, DWORD dwOptions, REGSAM samDesired, LPSECURITY_ATTRIBUTES lpSecurityAttributes, PHKEY phkResult, LPDWORD lpdwDisposition) {
+	time_t t;
+	time(&t);
+
+	LONG ret = Orig_RegCreateKeyExW(hKey, lpSubKey, Reserved, lpClass, dwOptions, samDesired, lpSecurityAttributes, phkResult, lpdwDisposition);
+	RegAPILog.print("RegCreateKeyExW* %d %X \"%s\" %X\n", ret, hKey, WSTR2STR(lpSubKey), phkResult ? *phkResult : NULL);
+	g_api->create_key(g_procId, (key_t)hKey, WSTR2STR(lpSubKey), (key_t)(phkResult? *phkResult : NULL), t, ret);
+	return ret;
+}
+
+ LONG WINAPI Hook_RegDeleteKeyA(HKEY hKey, LPCSTR lpSubKey) {
+	//char buf[MAX_BUF_LEN];
+	time_t t;
+	time(&t);
+
+	LONG ret = Orig_RegDeleteKeyA(hKey, lpSubKey);
+	//strncpy(buf, sizeof(buf), "RegDeleteKeyA");
+	RegAPILog.print("RegDeleteKeyA* %d %X \"%s\"\n", ret, hKey, lpSubKey);
+	g_api->remove_key(g_procId, (key_t)hKey, lpSubKey, t, ret);
+	return ret;
+}
+
+ LONG WINAPI Hook_RegDeleteKeyW(HKEY hKey, LPCWSTR lpSubKey) {
+	//char buf[MAX_BUF_LEN];
+	time_t t;
+	time(&t);
+
+	LONG ret = Orig_RegDeleteKeyW(hKey, lpSubKey);
+	//strncpy(buf, sizeof(buf), "RegDeleteKeyW");
+	RegAPILog.print("RegDeleteKeyW* %d %X \"%s\"\n", ret, hKey, WSTR2STR(lpSubKey));
+	g_api->remove_key(g_procId, (key_t)hKey, WSTR2STR(lpSubKey), t, ret);
+	return ret;
+}
+
+ LONG WINAPI Hook_RegDeleteKeyExA(HKEY hKey, LPCSTR lpSubKey, REGSAM samDesired, DWORD Reserved) {
+	//char buf[MAX_BUF_LEN];
+	time_t t;
+	time(&t);
+
+	LONG ret = Orig_RegDeleteKeyExA(hKey, lpSubKey, samDesired, Reserved);
+	//strncpy(buf, sizeof(buf), "RegDeleteKeyExA");
+	RegAPILog.print("RegDeleteKeyExA* %d %X \"%s\"\n", ret, hKey, lpSubKey);
+	g_api->remove_key(g_procId, (key_t)hKey, lpSubKey, t, ret);
+	return ret;
+}
+
+ LONG WINAPI Hook_RegDeleteKeyExW(HKEY hKey, LPCWSTR lpSubKey, REGSAM samDesired, DWORD Reserved) {
+	//char buf[MAX_BUF_LEN];
+	time_t t;
+	time(&t);
+
+	LONG ret = Orig_RegDeleteKeyExW(hKey, lpSubKey, samDesired, Reserved);
+	//strncpy(buf, sizeof(buf), "RegDeleteKeyExW");
+	RegAPILog.print("RegDeleteKeyExW* %d %X \"%s\"\n", ret, hKey, WSTR2STR(lpSubKey));
+	g_api->remove_key(g_procId, (key_t)hKey, WSTR2STR(lpSubKey), t, ret);
+	return ret;
+}
+
+ LONG WINAPI Hook_RegDeleteValueA(HKEY hKey, LPCSTR lpValueName) {
+	//char buf[MAX_BUF_LEN];
+	time_t t;
+	time(&t);
+
+	LONG ret = Orig_RegDeleteValueA(hKey, lpValueName);
+	//strncpy(buf, sizeof(buf), "RegDeleteValueA");
+	RegAPILog.print("RegDeleteValueA* %d %X \"%s\"\n", ret, hKey, lpValueName);
+	g_api->remove_value(g_procId, (key_t)hKey, lpValueName, t, ret);
+	return ret;
+}
+
+ LONG WINAPI Hook_RegDeleteValueW(HKEY hKey, LPCWSTR lpValueName) {
+	//char buf[MAX_BUF_LEN];
+	time_t t;
+	time(&t);
+
+	LONG ret = Orig_RegDeleteValueW(hKey, lpValueName);
+	//strncpy(buf, sizeof(buf), "RegDeleteValueW");
+	RegAPILog.print("RegDeleteValueW* %d %X \"%s\"\n", ret, hKey, WSTR2STR(lpValueName));
+	g_api->remove_value(g_procId, (key_t)hKey, WSTR2STR(lpValueName), t, ret);
+	return ret;
+}
+
+ LONG WINAPI Hook_RegDisablePredefinedCache() {
+	//char buf[MAX_BUF_LEN];
+
+	LONG ret = Orig_RegDisablePredefinedCache();
+	//strncpy(buf, sizeof(buf), "RegDisablePredefinedCache");
+	RegAPILog.print("RegDisablePredefinedCache %d\n", ret);
+	return ret;
+}
+
+ LONG WINAPI Hook_RegDisableReflectionKey(HKEY hBase) {
+	//char buf[MAX_BUF_LEN];
+
+	LONG ret = Orig_RegDisableReflectionKey(hBase);
+	//strncpy(buf, sizeof(buf), "RegDisableReflectionKey");
+	RegAPILog.print("RegDisableReflectionKey %d %X\n", ret, hBase);
+	return ret;
+}
+
+ LONG WINAPI Hook_RegEnableReflectionKey(HKEY hBase) {
+	//char buf[MAX_BUF_LEN];
+
+	LONG ret = Orig_RegEnableReflectionKey(hBase);
+	//strncpy(buf, sizeof(buf), "RegEnableReflectionKey");
+	RegAPILog.print("RegEnableReflectionKey %d %X\n", ret, hBase);
+	return ret;
+}
+
+ LONG WINAPI Hook_RegEnumKeyEx(HKEY hKey, DWORD dwIndex, LPTSTR lpName, LPDWORD lpcName, LPDWORD lpReserved, LPTSTR lpClass, LPDWORD lpcClass, PFILETIME lpftLastWriteTime) {
+	//char buf[MAX_BUF_LEN];
+
+	LONG ret = Orig_RegEnumKeyEx(hKey, dwIndex, lpName, lpcName, lpReserved, lpClass, lpcClass, lpftLastWriteTime);
+	//strncpy(buf, sizeof(buf), "RegEnumKeyEx");
+	RegAPILog.print("RegEnumKeyEx %d %X %d\n", ret, hKey, dwIndex);
+	return ret;
+}
+
+ LONG WINAPI Hook_RegEnumValue(HKEY hKey, DWORD dwIndex, LPTSTR lpValueName, LPDWORD lpcValueName, LPDWORD lpReserved, LPDWORD lpType, LPBYTE lpData, LPDWORD lpcbData) {
+	//char buf[MAX_BUF_LEN];
+
+	LONG ret = Orig_RegEnumValue(hKey, dwIndex, lpValueName, lpcValueName, lpReserved, lpType, lpData, lpcbData);
+	//strncpy(buf, sizeof(buf), "RegEnumValue");
+	RegAPILog.print("RegEnumValue %d %X %d\n", ret, hKey, dwIndex);
+	return ret;
+}
+
+ LONG WINAPI Hook_RegFlushKey(HKEY hKey) {
+	//char buf[MAX_BUF_LEN];
+
+	LONG ret = Orig_RegFlushKey(hKey);
+	//strncpy(buf, sizeof(buf), "RegFlushKey");
+	RegAPILog.print("RegFlushKey %d %X\n", ret, hKey);
+	return ret;
+}
+
+ LONG WINAPI Hook_RegGetKeySecurity(HKEY hKey, SECURITY_INFORMATION SecurityInformation, PSECURITY_DESCRIPTOR pSecurityDescriptor, LPDWORD lpcbSecurityDescriptor) {
+	//char buf[MAX_BUF_LEN];
+
+	LONG ret = Orig_RegGetKeySecurity(hKey, SecurityInformation, pSecurityDescriptor, lpcbSecurityDescriptor);
+	//strncpy(buf, sizeof(buf), "RegGetKeySecurity");
+	RegAPILog.print("RegGetKeySecurity %d %X\n", ret, hKey);
+	return ret;
+}
+
+  LONG WINAPI Hook_RegGetValueA(HKEY hkey, LPCSTR lpSubKey, LPCSTR lpValue, DWORD dwFlags, LPDWORD pdwType, PVOID pvData, LPDWORD pcbData) {
+	time_t t;
+	time(&t);
+
+	LONG ret = Orig_RegGetValueA(hkey, lpSubKey, lpValue, dwFlags, pdwType, pvData, pcbData);
+	RegAPILog.print("RegGetValueA* %d %X \"%s\"\"%s\"\n", ret, hkey, lpSubKey, lpValue);
+	g_api->get_value(g_procId, (key_t)hkey, lpSubKey, lpValue, pdwType? *pdwType : NULL, (const char *)pvData, pcbData? *pcbData : 0, t, ret);
+	return ret;
+ }
+
+ LONG WINAPI Hook_RegGetValueW(HKEY hkey, LPCWSTR lpSubKey, LPCWSTR lpValue, DWORD dwFlags, LPDWORD pdwType, PVOID pvData, LPDWORD pcbData) {
+    time_t t;
+	time(&t);
+
+	LONG ret = Orig_RegGetValueW(hkey, lpSubKey, lpValue, dwFlags, pdwType, pvData, pcbData);
+	RegAPILog.print("RegGetValueW* %d %X \"%s\"\"%s\"\n", ret, hkey, WSTR2STR(lpSubKey), WSTR2STR(lpValue));
+	g_api->get_value(g_procId, (key_t)hkey, WSTR2STR(lpSubKey), WSTR2STR(lpValue), pdwType? *pdwType : NULL, (const char *)pvData, pcbData? *pcbData : 0, t, ret);
+	return ret;
+}
+
+ LONG WINAPI Hook_RegLoadKeyA(HKEY hKey, LPCSTR lpSubKey, LPCSTR lpFile) {
+	//char buf[MAX_BUF_LEN];
+
+	LONG ret = Orig_RegLoadKeyA(hKey, lpSubKey, lpFile);
+	//strncpy(buf, sizeof(buf), "RegLoadKeyA");
+	RegAPILog.print("RegLoadKeyA %d %X \"%s\"\"%s\"\n", ret, hKey, lpSubKey, lpFile);
+	return ret;
+}
+
+ LONG WINAPI Hook_RegLoadKeyW(HKEY hKey, LPCWSTR lpSubKey, LPCWSTR lpFile) {
+	//char buf[MAX_BUF_LEN];
+
+	LONG ret = Orig_RegLoadKeyW(hKey, lpSubKey, lpFile);
+	//strncpy(buf, sizeof(buf), "RegLoadKeyW");
+	RegAPILog.print("RegLoadKeyW %d %X \"%s\"\"%s\"\n", ret, hKey, WSTR2STR(lpSubKey), WSTR2STR(lpFile));
+	return ret;
+}
+
+ LONG WINAPI Hook_RegNotifyChangeKeyValue(HKEY hKey, BOOL bWatchSubtree, DWORD dwNotifyFilter, HANDLE hEvent, BOOL fAsynchronous) {
+	//char buf[MAX_BUF_LEN];
+
+	LONG ret = Orig_RegNotifyChangeKeyValue(hKey, bWatchSubtree, dwNotifyFilter, hEvent, fAsynchronous);
+	//strncpy(buf, sizeof(buf), "RegNotifyChangeKeyValue");
+	RegAPILog.print("RegNotifyChangeKeyValue %d %X\n", ret, hKey);
+	return ret;
+}
+
+ LONG WINAPI Hook_RegOpenCurrentUser(REGSAM samDesired, PHKEY phkResult) {
+	//char buf[MAX_BUF_LEN];
+	time_t t;
+	time(&t);
+
+	LONG ret = Orig_RegOpenCurrentUser(samDesired, phkResult);
+	//strncpy(buf, sizeof(buf), "RegOpenCurrentUser");
+	RegAPILog.print("RegOpenCurrentUser* %d \"CURRENT_USER\" %X\n", ret, phkResult ? *phkResult : NULL);
+	g_api->open_key(g_procId, 0, "CURRENT_USER", (key_t)(phkResult? *phkResult : 0), t, ret);
+	return ret;
+}
+
+LONG WINAPI Hook_RegOpenKeyExA(HKEY hKey, LPCSTR lpSubKey, DWORD ulOptions, REGSAM samDesired, PHKEY phkResult) {
+	time_t t;
+	time(&t);
+
+	LONG ret = Orig_RegOpenKeyExA(hKey, lpSubKey, ulOptions, samDesired, phkResult);
+	RegAPILog.print("RegOpenKeyExA* %d %X \"%s\" %X\n", ret, hKey, lpSubKey, phkResult ? *phkResult : NULL);
+	g_api->open_key(g_procId, (key_t)hKey, lpSubKey, (key_t)(phkResult? *phkResult : 0), t, ret);
+	return ret;
+}
+
+ LONG WINAPI Hook_RegOpenKeyExW(HKEY hKey, LPCWSTR lpSubKey, DWORD ulOptions, REGSAM samDesired, PHKEY phkResult) {
+	time_t t;
+	time(&t);
+
+	LONG ret = Orig_RegOpenKeyExW(hKey, lpSubKey, ulOptions, samDesired, phkResult);
+	RegAPILog.print("RegOpenKeyExW* %d %X \"%s\" %X\n", ret, hKey, WSTR2STR(lpSubKey), phkResult ? *phkResult : NULL);
+	g_api->open_key(g_procId, (key_t)hKey, WSTR2STR(lpSubKey), (key_t)(phkResult? *phkResult : 0), t, ret);
+	return ret;
+}
+
+ LONG WINAPI Hook_RegOpenUserClassesRoot(HANDLE hToken, DWORD dwOptions, REGSAM samDesired, PHKEY phkResult) {
+	//char buf[MAX_BUF_LEN];
+	time_t t;
+	time(&t);
+
+	LONG ret = Orig_RegOpenUserClassesRoot(hToken, dwOptions, samDesired, phkResult);
+	//strncpy(buf, sizeof(buf), "RegOpenUserClassesRoot");
+	RegAPILog.print("RegOpenUserClassesRoot* %d \"USER_CLASSES_ROOT\" %X\n", ret, phkResult ? *phkResult : NULL);
+	g_api->open_key(g_procId, 0, "USER_CLASSES_ROOT", (key_t)(phkResult? *phkResult : 0), t, ret);
+	return ret;
+}
+
+ LONG WINAPI Hook_RegOverridePredefKey(HKEY hKey, HKEY hNewHKey) {
+	//char buf[MAX_BUF_LEN];
+
+	LONG ret = Orig_RegOverridePredefKey(hKey, hNewHKey);
+	//strncpy(buf, sizeof(buf), "RegOverridePredefKey");
+	RegAPILog.print("RegOverridePredefKey %d %X %X\n", ret, hKey, hNewHKey);
+	return ret;
+}
+
+ LONG WINAPI Hook_RegQueryInfoKey(HKEY hKey, LPTSTR lpClass, LPDWORD lpcClass, LPDWORD lpReserved, LPDWORD lpcSubKeys, LPDWORD lpcMaxSubKeyLen, LPDWORD lpcMaxClassLen, LPDWORD lpcValues, LPDWORD lpcMaxValueNameLen, LPDWORD lpcMaxValueLen, LPDWORD lpcbSecurityDescriptor, PFILETIME lpftLastWriteTime) {
+	//char buf[MAX_BUF_LEN];
+
+	LONG ret = Orig_RegQueryInfoKey(hKey, lpClass, lpcClass, lpReserved, lpcSubKeys, lpcMaxSubKeyLen, lpcMaxClassLen, lpcValues, lpcMaxValueNameLen, lpcMaxValueLen, lpcbSecurityDescriptor, lpftLastWriteTime);
+	//strncpy(buf, sizeof(buf), "RegQueryInfoKey");
+	RegAPILog.print("RegQueryInfoKey %d %X\n", ret, hKey);
+	return ret;
+}
+
+ LONG WINAPI Hook_RegQueryMultipleValues(HKEY hKey, PVALENT val_list, DWORD num_vals, LPTSTR lpValueBuf, LPDWORD ldwTotsize) {
+	//char buf[MAX_BUF_LEN];
+
+	LONG ret = Orig_RegQueryMultipleValues(hKey, val_list, num_vals, lpValueBuf, ldwTotsize);
+	//strncpy(buf, sizeof(buf), "RegQueryMultipleValues");
+	RegAPILog.print("RegQueryMultipleValues %d %X\n", ret, hKey);
+	return ret;
+}
+
+ LONG WINAPI Hook_RegQueryReflectionKey(HKEY hBase, BOOL bIsReflectionDisabled) {
+	//char buf[MAX_BUF_LEN];
+
+	LONG ret = Orig_RegQueryReflectionKey(hBase, bIsReflectionDisabled);
+	//strncpy(buf, sizeof(buf), "RegQueryReflectionKey");
+	RegAPILog.print("RegQueryReflectionKey %d %X\n", ret, hBase);
+	return ret;
+}
+
+ LONG WINAPI Hook_RegQueryValueExA(HKEY hKey, LPCSTR lpValueName, LPDWORD lpReserved, LPDWORD lpType, LPBYTE lpData, LPDWORD lpcbData) {
+	time_t t;
+	time(&t);
+	DWORD type;
+
+	LONG ret = Orig_RegQueryValueExA(hKey, lpValueName, lpReserved, &type, lpData, lpcbData);
+
+	if (ret == ERROR_SUCCESS) {
+		if (lpType)
+			*lpType = type;
+		switch(type) {
+		case REG_DWORD:
+			RegAPILog.print("RegQueryValueExA* %d %X \"%s\" %d %d\n", ret, hKey, lpValueName, type, lpData ? *lpData : 0);
+			break;
+		case REG_EXPAND_SZ:
+		case REG_SZ:
+			RegAPILog.print("RegQueryValueExA* %d %X \"%s\" %d \"%s\"\n", ret, hKey, lpValueName, type, lpData ? lpData : 0);
+			break;
+		default:
+			RegAPILog.print("RegQueryValueExA* %d %X \"%s\" %d\n", ret, hKey, lpValueName, type);
+			break;
+		}
+	} else
+		RegAPILog.print("RegQueryValueExA* %d %X \"%s\" %d\n", ret, hKey, lpValueName, type);
+	g_api->get_value(g_procId, (key_t)hKey, "", lpValueName, type, (const char *)lpData, lpcbData? *lpcbData : 0, t, ret);
+	 return ret;
+}
+
+ LONG WINAPI Hook_RegQueryValueExW(HKEY hKey, LPCWSTR lpValueName, LPDWORD lpReserved, LPDWORD lpType, LPBYTE lpData, LPDWORD lpcbData) {
+	time_t t;
+	time(&t);
+	char name[MAX_BUF_LEN];
+	char data[MAX_BUF_LEN];
+	const char *ptr = NULL;
+	DWORD type;
+
+	LONG ret = Orig_RegQueryValueExW(hKey, lpValueName, lpReserved, &type, lpData, lpcbData);
+	if (ret == ERROR_SUCCESS) {
+		if (lpType)
+			*lpType = type;
+		switch(type) {
+		case REG_DWORD:
+			RegAPILog.print("RegQueryValueExW* %d %X \"%s\" %d %d\n", ret, hKey, WSTR2STR(lpValueName), type, lpData ? *lpData : 0);
+			break;
+		case REG_EXPAND_SZ:
+		case REG_SZ:
+			ptr = WSTR2STR((LPCWSTR)lpData);
+			if (ptr) {
+				strncpy(data, ptr, sizeof(data));
+				data[sizeof(data) - 1] = '\0';
+			} else
+				data[0] = '\0';
+			ptr = WSTR2STR((LPCWSTR)lpValueName);
+			if (ptr) {
+				strncpy(name, ptr, sizeof(name));
+				name[sizeof(name) - 1] = '\0';
+			} else
+				name[0] = '\0';
+			RegAPILog.print("RegQueryValueExW* %d %X \"%s\" %d \"%s\"\n", ret, hKey, name, type, data);
+			//RegAPILog.print("RegQueryValueExW* %d %X \"%s\" %d \"%s\"\n", ret, hKey, WSTR2STR(lpValueName), type, WSTR2STR((LPCWSTR)lpData));
+			break;
+		default:
+			RegAPILog.print("RegQueryValueExW* %d %X \"%s\" %d\n", ret, hKey, WSTR2STR(lpValueName), type);
+			break;
+		}
+	} else
+		RegAPILog.print("RegQueryValueExW* %d %X \"%s\" %d\n", ret, hKey, WSTR2STR(lpValueName), type);
+	g_api->get_value(g_procId, (key_t)hKey, "", WSTR2STR(lpValueName), type, (const char *)lpData, lpcbData? *lpcbData : 0, t, ret);
+	return ret;
+}
+
+ LONG WINAPI Hook_RegReplaceKeyA(HKEY hKey, LPCSTR lpSubKey, LPCSTR lpNewFile, LPCSTR lpOldFile) {
+	//char buf[MAX_BUF_LEN];
+
+	LONG ret = Orig_RegReplaceKeyA(hKey, lpSubKey, lpNewFile, lpOldFile);
+	//strncpy(buf, sizeof(buf), "RegReplaceKeyA");
+	RegAPILog.print("RegReplaceKeyA %d %X \"%s\"\"%s\"\"%s\"\n", ret, hKey, lpSubKey, lpNewFile, lpOldFile);
+	return ret;
+}
+
+ LONG WINAPI Hook_RegReplaceKeyW(HKEY hKey, LPCWSTR lpSubKey, LPCWSTR lpNewFile, LPCWSTR lpOldFile) {
+	//char buf[MAX_BUF_LEN];
+
+	LONG ret = Orig_RegReplaceKeyW(hKey, lpSubKey, lpNewFile, lpOldFile);
+	//strncpy(buf, sizeof(buf), "RegReplaceKeyW");
+	RegAPILog.print("RegReplaceKeyW %d %X \"%s\"\"%s\"\"%s\"\n", ret, hKey, WSTR2STR(lpSubKey), WSTR2STR(lpNewFile), WSTR2STR(lpOldFile));
+	return ret;
+}
+
+ LONG WINAPI Hook_RegRestoreKeyA(HKEY hKey, LPCSTR lpFile, DWORD dwFlags) {
+	//char buf[MAX_BUF_LEN];
+
+	LONG ret = Orig_RegRestoreKeyA(hKey, lpFile, dwFlags);
+	//strncpy(buf, sizeof(buf), "RegRestoreKeyA");
+	RegAPILog.print("RegRestoreKeyA %d %X \"%s\" %d\n", ret, lpFile, dwFlags);
+	return ret;
+}
+
+ LONG WINAPI Hook_RegRestoreKeyW(HKEY hKey, LPCWSTR lpFile, DWORD dwFlags) {
+	//char buf[MAX_BUF_LEN];
+
+	LONG ret = Orig_RegRestoreKeyW(hKey, lpFile, dwFlags);
+	//strncpy(buf, sizeof(buf), "RegRestoreKeyW");
+	RegAPILog.print("RegRestoreKeyW %d %X \"%s\" %d\n", ret, WSTR2STR(lpFile), dwFlags);
+	return ret;
+}
+
+ LONG WINAPI Hook_RegSaveKeyA(HKEY hKey, LPCSTR lpFile, LPSECURITY_ATTRIBUTES lpSecurityAttributes) {
+	//char buf[MAX_BUF_LEN];
+
+	LONG ret = Orig_RegSaveKeyA(hKey, lpFile, lpSecurityAttributes);
+	//strncpy(buf, sizeof(buf), "RegSaveKeyA");
+	RegAPILog.print("RegSaveKeyA %d %X \"%s\"\n", ret, hKey, lpFile);
+	return ret;
+}
+
+ LONG WINAPI Hook_RegSaveKeyW(HKEY hKey, LPCWSTR lpFile, LPSECURITY_ATTRIBUTES lpSecurityAttributes) {
+	//char buf[MAX_BUF_LEN];
+
+	LONG ret = Orig_RegSaveKeyW(hKey, lpFile, lpSecurityAttributes);
+	//strncpy(buf, sizeof(buf), "RegSaveKeyW");
+	RegAPILog.print("RegSaveKeyW %d %X \"%s\"\n", ret, hKey, lpFile);
+	return ret;
+}
+
+ LONG WINAPI Hook_RegSaveKeyExA(HKEY hKey, LPCSTR lpFile, LPSECURITY_ATTRIBUTES lpSecurityAttributes, DWORD Flags) {
+	//char buf[MAX_BUF_LEN];
+
+	LONG ret = Orig_RegSaveKeyExA(hKey, lpFile, lpSecurityAttributes, Flags);
+	//strncpy(buf, sizeof(buf), "RegSaveKeyExA");
+	RegAPILog.print("RegSaveKeyExA %d %X \"%s\" %d\n", ret, hKey, lpFile, Flags);
+	return ret;
+}
+
+ LONG WINAPI Hook_RegSaveKeyExW(HKEY hKey, LPCWSTR lpFile, LPSECURITY_ATTRIBUTES lpSecurityAttributes, DWORD Flags) {
+	//char buf[MAX_BUF_LEN];
+
+	LONG ret = Orig_RegSaveKeyExW(hKey, lpFile, lpSecurityAttributes, Flags);
+	//strncpy(buf, sizeof(buf), "RegSaveKeyExW");
+	RegAPILog.print("RegSaveKeyExW %d %X \"%s\" %d\n", ret, hKey, lpFile, Flags);
+	return ret;
+}
+
+ LONG WINAPI Hook_RegSetKeySecurity(HKEY hKey, SECURITY_INFORMATION SecurityInformation, PSECURITY_DESCRIPTOR pSecurityDescriptor) {
+	//char buf[MAX_BUF_LEN];
+
+	LONG ret = Orig_RegSetKeySecurity(hKey, SecurityInformation, pSecurityDescriptor);
+	//strncpy(buf, sizeof(buf), "RegSetKeySecurity");
+	RegAPILog.print("RegSetKeySecurity %d %X\n", ret, hKey);
+	return ret;
+}
+
+ LONG WINAPI Hook_RegSetValueExA(HKEY hKey, LPCSTR lpValueName, DWORD Reserved, DWORD dwType, const BYTE* lpData, DWORD cbData) {
+	//char buf[MAX_BUF_LEN];
+	time_t t;
+	time(&t);
+
+	LONG ret = Orig_RegSetValueExA(hKey, lpValueName, Reserved, dwType, lpData, cbData);
+	//strncpy(buf, sizeof(buf), "RegSetValueExA");
+	switch(dwType) {
+	case REG_DWORD:
+		RegAPILog.print("RegSetValueExA* %d %X %d %d \"%s\" %d\n", ret, hKey, dwType, cbData, lpValueName, *lpData);
+		break;
+	case REG_EXPAND_SZ:
+	case REG_SZ:
+		RegAPILog.print("RegSetValueExA* %d %X %d %d \"%s\"%s\n", ret, hKey, dwType, cbData, lpValueName, lpData);
+		break;
+	default:
+		RegAPILog.print("RegSetValueExA* %d %X %d %d \"%s\"\n", ret, hKey, dwType, cbData, lpValueName);
+		break;
+	}
+	g_api->set_value(g_procId, (key_t)hKey, "", lpValueName, dwType, (const char *)lpData, cbData, t, ret);
+	return ret;
+}
+
+ LONG WINAPI Hook_RegSetValueExW(HKEY hKey, LPCWSTR lpValueName, DWORD Reserved, DWORD dwType, const BYTE* lpData, DWORD cbData) {
+	char name[MAX_BUF_LEN];
+	char data[MAX_BUF_LEN];
+	const char *ptr = NULL;
+
+	time_t t;
+	time(&t);
+
+	LONG ret = Orig_RegSetValueExW(hKey, lpValueName, Reserved, dwType, lpData, cbData);
+	//strncpy(buf, sizeof(buf), "RegSetValueExW");
+	switch(dwType) {
+	case REG_DWORD:
+		RegAPILog.print("RegSetValueExW* %d %X %d %d \"%s\" %d\n", ret, hKey, dwType, cbData, WSTR2STR(lpValueName), *lpData);
+		break;
+	case REG_EXPAND_SZ:
+	case REG_SZ:
+		ptr = WSTR2STR((LPCWSTR)lpData);
+		if (ptr) {
+			strncpy(data, ptr, sizeof(data));
+			data[sizeof(data) - 1] = '\0';
+		} else
+			data[0] = '\0';
+		ptr = WSTR2STR((LPCWSTR)lpValueName);
+		if (ptr) {
+			strncpy(name, ptr, sizeof(name));
+			name[sizeof(name) - 1] = '\0';
+		} else
+			name[0] = '\0';
+		RegAPILog.print("RegSetValueExW* %d %X %d \"%s\" %d \"%s\"\n", ret, hKey, cbData, name, dwType, data);
+		break;
+	default:
+		RegAPILog.print("RegSetValueExW* %d %X %d %d \"%s\"\n", ret, hKey, dwType, cbData, WSTR2STR(lpValueName));
+		break;
+	}
+	g_api->set_value(g_procId, (key_t)hKey, "", WSTR2STR(lpValueName), dwType, (const char *)lpData, cbData, t, ret);
+	return ret;
+}
+
+ LONG WINAPI Hook_RegUnLoadKeyA(HKEY hKey, LPCSTR lpSubKey) {
+	//char buf[MAX_BUF_LEN];
+
+	LONG ret = Orig_RegUnLoadKeyA(hKey, lpSubKey);
+	//strncpy(buf, sizeof(buf), "RegUnLoadKeyA");
+	RegAPILog.print("RegUnLoadKeyA %d %X \"%s\"\n", ret, hKey, lpSubKey);
+	return ret;
+}
+
+ LONG WINAPI Hook_RegUnLoadKeyW(HKEY hKey, LPCWSTR lpSubKey) {
+	//char buf[MAX_BUF_LEN];
+
+	LONG ret = Orig_RegUnLoadKeyW(hKey, lpSubKey);
+	//strncpy(buf, sizeof(buf), "RegUnLoadKeyW");
+	RegAPILog.print("RegUnLoadKeyW %d %X \"%s\"\n", ret, hKey, WSTR2STR(lpSubKey));
+	return ret;
+}
+
+
+/*
+ * HookAllAPI: Enable all hook functions
+ */
+#define HOOKAPI(DLL, FUNC) Hook_h##FUNC=HookAPI(#DLL, #FUNC, (PROC)Hook_##FUNC, (PROC *)&Orig_##FUNC);
+ 
+BOOL HookAllAPI()
+{
+	RegAPILog.print("HookAllAPI\n");
+	
+	//HOOKAPI(ADVAPI32.DLL,RegCloseKey); // for debugging
+	//HOOKAPI(ADVAPI32.DLL,RegCloseKey); // for debugging
+
+	HOOKAPI(ADVAPI32.DLL,RegCloseKey);
+
+	HOOKAPI(ADVAPI32.DLL,RegConnectRegistryA);
+
+	HOOKAPI(ADVAPI32.DLL,RegConnectRegistryW);
+
+	HOOKAPI(ADVAPI32.DLL,RegCreateKeyExA);
+
+	HOOKAPI(ADVAPI32.DLL,RegCreateKeyExW);
+
+	HOOKAPI(ADVAPI32.DLL,RegDeleteKeyA);
+
+	HOOKAPI(ADVAPI32.DLL,RegDeleteKeyW);
+
+	HOOKAPI(ADVAPI32.DLL,RegDeleteKeyExA);
+
+	HOOKAPI(ADVAPI32.DLL,RegDeleteKeyExW);
+
+	HOOKAPI(ADVAPI32.DLL,RegDeleteValueA);
+
+	HOOKAPI(ADVAPI32.DLL,RegDeleteValueW);
+
+	HOOKAPI(ADVAPI32.DLL,RegDisablePredefinedCache);
+
+	HOOKAPI(ADVAPI32.DLL,RegDisableReflectionKey);
+
+	HOOKAPI(ADVAPI32.DLL,RegEnableReflectionKey);
+
+	HOOKAPI(ADVAPI32.DLL,RegEnumKeyEx);
+
+	HOOKAPI(ADVAPI32.DLL,RegEnumValue);
+
+	HOOKAPI(ADVAPI32.DLL,RegFlushKey);
+
+	HOOKAPI(ADVAPI32.DLL,RegGetKeySecurity);
+
+	HOOKAPI(ADVAPI32.DLL,RegGetValueA);
+
+	HOOKAPI(ADVAPI32.DLL,RegGetValueW);
+
+	HOOKAPI(ADVAPI32.DLL,RegLoadKeyA);
+
+	HOOKAPI(ADVAPI32.DLL,RegLoadKeyW);
+
+	HOOKAPI(ADVAPI32.DLL,RegNotifyChangeKeyValue);
+
+	HOOKAPI(ADVAPI32.DLL,RegOpenCurrentUser);
+
+	HOOKAPI(ADVAPI32.DLL,RegOpenKeyExA);
+
+	HOOKAPI(ADVAPI32.DLL,RegOpenKeyExW);
+
+	HOOKAPI(ADVAPI32.DLL,RegOpenUserClassesRoot);
+
+	HOOKAPI(ADVAPI32.DLL,RegOverridePredefKey);
+
+	HOOKAPI(ADVAPI32.DLL,RegQueryInfoKey);
+
+	HOOKAPI(ADVAPI32.DLL,RegQueryMultipleValues);
+
+	HOOKAPI(ADVAPI32.DLL,RegQueryReflectionKey);
+
+	HOOKAPI(ADVAPI32.DLL,RegQueryValueExA);
+
+	HOOKAPI(ADVAPI32.DLL,RegQueryValueExW);
+
+	HOOKAPI(ADVAPI32.DLL,RegReplaceKeyA);
+
+	HOOKAPI(ADVAPI32.DLL,RegReplaceKeyW);
+
+	HOOKAPI(ADVAPI32.DLL,RegRestoreKeyA);
+
+	HOOKAPI(ADVAPI32.DLL,RegRestoreKeyW);
+
+	HOOKAPI(ADVAPI32.DLL,RegSaveKeyA);
+
+	HOOKAPI(ADVAPI32.DLL,RegSaveKeyW);
+
+	HOOKAPI(ADVAPI32.DLL,RegSaveKeyExA);
+
+	HOOKAPI(ADVAPI32.DLL,RegSaveKeyExW);
+
+	HOOKAPI(ADVAPI32.DLL,RegSetKeySecurity);
+
+	HOOKAPI(ADVAPI32.DLL,RegSetValueExA);
+
+	HOOKAPI(ADVAPI32.DLL,RegSetValueExW);
+
+	HOOKAPI(ADVAPI32.DLL,RegUnLoadKeyA);
+
+	HOOKAPI(ADVAPI32.DLL,RegUnLoadKeyW);
+
+	return TRUE;
+}
+
