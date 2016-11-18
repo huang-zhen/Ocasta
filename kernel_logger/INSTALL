@@ -1,0 +1,26 @@
+This is the installation guide for Ocasta's Linux system call logger, kernel_logger, which intercept system calls and save information about the system calls into log files. It consists of a kernel module and a loader executable.
+
+1. Build and install the kernel module and loader executable
+
+$ cd kernel_logger
+$ make
+$ sudo make install 
+
+2. Start the kernel logging
+
+$ sudo /etc/init.d/ocasta start
+
+3. Check the status of the kernel_logger
+
+$ cat /proc/audit
+
+4. Stop the kernel logging
+
+$ sudo /etc/init.d/ocasta stop
+
+5. Format of a log file
+
+The log files are stored under /etc/ocasta directory and the format of the log files are declared in ocasta_dat.h. Each log file is composed of a header and a number of log entries, each corresponds to a system call. 
+
+Both the header and log entry are defined in ocasta_dat.h. The header contains a string signature and the version of the kernel_logger, and the size of each log entry. And information about each logged system call consists of a log entry, which contains information such as the pid of the process that issues the system call, the pathname of the file being written if the system call writes to a file, followed by the actual data being written.
+

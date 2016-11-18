@@ -1,0 +1,118 @@
+#!/bin/bash
+#
+# ocasta start or stop the ocasta system call logging facility
+# chkconfig: 345 25 75
+# description: ocasta is a versioning system.
+# processname: ocasta
+#
+
+# This file should set the OCASTA_DIR and OPTIONS variables
+if [ -f /etc/ocasta/ocasta.conf ]; then
+    . /etc/ocasta/ocasta.conf
+else
+  echo "Error: ocasta configuration file not found by $0" > /dev/stderr
+  exit 1
+fi
+
+if [ -z "${OCASTA_DIR}" ]; then
+        echo "ocasta directory is not set" 1>&2;
+        exit 1;
+fi
+
+# Source function library.
+if [ -f /lib/lsb/init-functions ]; then
+  . /lib/lsb/init-functions
+  START_DAEMON=start_daemon
+elif [ -f /etc/init.d/functions ]; then
+  . /etc/init.d/functions
+  START_DAEMON=daemon
+else
+  echo "Error: your platform is not supported by $0" > /dev/stderr
+  exit 1
+fi
+
+modprobe ocasta_module logging=$LOGGING
+
+NAME=ocasta
+DAEMON=/usr/sbin/$NAME
+
+# Exit if the package is not installed
+[ -x "$DAEMON" ] || exit 0
+
+do_start() {
+	echo -n $"Starting $NAME: "
+	chmod 0777 $OCASTA_DIR/.dir
+	$START_DAEMON $DAEMON -d $OCASTA_DIR $OPTIONS 
+}
+
+do_loadconf() {
+	echo -n $"$NAME reloading autoconf: "
+	$NAME -l
+}
+
+do_switch() {
+	echo -n $"$NAME switch auditing: "
+	$NAME -w
+}
+
+do_stop() {
+	echo -n $"$NAME stop auditing: "
+	$NAME --stop
+	sleep 2
+	do_status
+	rmmod ocasta_module
+}
+
+do_show_version_log() {
+	echo -n $"$NAME show version log: "
+	$NAME -v 1
+}
+
+do_hide_version_log() {
+	echo -n $"$NAME hide version log: "
+	$NAME -v 0
+}
+
+do_status() {
+
+  PROC_FILE=/proc/auditinfo
+  if [ -f $PROC_FILE ]; then
+    ACTIVE=$(cat $PROC_FILE | grep "mode" | awk '{print $3}' 2> /dev/null)    
+    if [ "x$ACTIVE" = "x1" ]; then
+      echo "$NAME is running"
+      return 0
+    fi
+  fi
+  echo "$NAME is not running"
+  return 3
+}	
+
+case "$1" in
+     start)
+	do_start
+	;;
+     status)
+	do_status
+	;;
+     loadconf)
+	do_loadconf
+	;;
+     switch)
+	do_switch
+	;;
+     stop)
+	do_stop
+	;;
+     show)
+	do_show_version_log
+	;;
+     hide)
+	do_hide_version_log
+	;;
+     *)
+	echo "Usage: $NAME {start|status|loadconf|switch|stop|show|hide}"
+	exit 1
+	;;
+esac
+
+exit $?
