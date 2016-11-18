@@ -1,3 +1,6 @@
+/*
+ * Copyright (C) 2016 Zhen Huang
+ */
 #ifdef WIN32
 #include <windows.h>
 #include <io.h>

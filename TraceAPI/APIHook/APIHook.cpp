@@ -1,5 +1,5 @@
 // APIHook.CPP
-// by James Huang
+// Copyright (C) 2016 Zhen Huang
 // Nov.16, 2002
 //
 #include <windows.h>

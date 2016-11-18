@@ -1,3 +1,6 @@
+/*
+ * Copyright (C) 2016 Zhen Huang
+ */
 #include "stdafx.h"
 #include "RealReadLog.h"
 #include "io.h"

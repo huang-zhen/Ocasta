@@ -1,3 +1,6 @@
+/*
+ * Copyright (C) 2016 Zhen Huang
+ */
 #include <time.h>
 #include <sys/types.h>
 #include <sys/stat.h>

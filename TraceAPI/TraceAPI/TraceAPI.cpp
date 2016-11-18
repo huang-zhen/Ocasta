@@ -1,3 +1,6 @@
+/*
+ * Copyright (C) 2016 Zhen Huang
+ */
 #include <windows.h>
 #include <tlhelp32.h>
 #include <shellapi.h>

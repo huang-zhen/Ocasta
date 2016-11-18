@@ -1,5 +1,5 @@
 // RegAPIHook.cpp : Defines the initialization routines for the DLL.
-// By James Huang
+// Copyright (C) 2016 Zhen Huang
 //
 // Nov.18, 2002
 // Nov.8, 2011
