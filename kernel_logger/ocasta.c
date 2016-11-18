@@ -1,6 +1,10 @@
 /**
  * The ocasta start program
  */
+/*
+ * Ocasta kernel_logger
+ * Copyright (C) 2016 Zhen Huang 
+*/
 
 #include <sys/ioctl.h>
 #include <sys/types.h>

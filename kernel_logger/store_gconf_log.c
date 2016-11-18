@@ -1,3 +1,8 @@
+/*
+ * Ocasta kernel_logger
+ * Copyright (C) 2016 Zhen Huang 
+*/
+
 #include <stdio.h>
 #include <string.h>
 #include <gconf/gconf-value.h>

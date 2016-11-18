@@ -40,7 +40,7 @@ libgconf_hook_se.so.1.0: libgconf_hook.o libgconf_msg_se.a
 
 install:
 	cp libgconf_hook.so.1.0 /usr/lib
-	#cp ld.so.preload /etc/
+	cp ld.so.preload /etc/
 
 uninstall:
 	rm /etc/ld.so.preload

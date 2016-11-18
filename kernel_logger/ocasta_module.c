@@ -7,6 +7,10 @@
  *
  * This module sits in the kernel and monitors system call information.
  */
+/*
+ * Ocasta kernel_logger
+ * Copyright (C) 2016 Zhen Huang 
+*/
 
 #define _FILE_OFFSET_BITS 64
 

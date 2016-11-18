@@ -1,5 +1,11 @@
+/*
+ * Test facility for gconf call logging 
+ * Copyright (C) 2016 Zhen Huang 
+*/
+
 #include <stdio.h>
 #include "gconf_msg.h"
+
 
 int main() {
 	int ret;

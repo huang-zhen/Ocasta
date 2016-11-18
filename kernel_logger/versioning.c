@@ -1,5 +1,9 @@
 // versioning.c
-// versioning misc utility functions
+// miscellaneous utility functions for versioning files
+/*
+ * Copyright (C) 2016 Zhen Huang 
+*/
+
 
 #include <stdio.h>
 #include <stdlib.h>

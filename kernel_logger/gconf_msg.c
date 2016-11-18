@@ -1,6 +1,11 @@
 /*
  * gconf_msg.c
  */
+/*
+ * Ocasta kernel_logger
+ * Copyright (C) 2016 Zhen Huang 
+*/
+
 #include <sys/msg.h>
 #include <sys/types.h>
 #include <unistd.h>
