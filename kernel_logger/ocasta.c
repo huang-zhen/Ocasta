@@ -1,10 +1,10 @@
 /**
  * The ocasta start program
+ *
+ * Mike Shea
+ * Ashvin Goel
+ * Zhen Huang
  */
-/*
- * Ocasta kernel_logger
- * Copyright (C) 2016 Zhen Huang 
-*/
 
 #include <sys/ioctl.h>
 #include <sys/types.h>
