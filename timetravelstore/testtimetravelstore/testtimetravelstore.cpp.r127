@@ -1,0 +1,28 @@
+// testtimetravelstore.cpp : Defines the entry point for the console application.
+//
+
+#include "stdafx.h"
+#include <iostream>
+#include "..\timetravelstore\timetravelstore.h"
+using namespace std;
+
+int _tmain(int argc, _TCHAR* argv[])
+{
+	TimeTravelStore store;
+	TimeTravelStore::key_info_t key_info;
+
+	if (store.init() != 0) {
+		cerr << "Error initialize timetravelstore" << endl;
+		return 1;
+	}
+	if (store.create_key("key2", 0) != 0) {
+		cerr << "Error calling create_key" << endl;
+		return 1;
+	}
+	if (store.get_key_info("key2", &key_info) != 0) {
+		cerr << "Error calling get_key_info" << endl;
+		return 1;
+	}
+	return 0;
+}
+

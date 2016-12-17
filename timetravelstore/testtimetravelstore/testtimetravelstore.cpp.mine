@@ -1,0 +1,71 @@
+// testtimetravelstore.cpp : Defines the entry point for the console application.
+//
+
+#ifdef WIN32
+#include "stdafx.h"
+#endif
+#include <stdio.h>
+#include <iostream>
+#include "../timetravelstore/timetravelstore.h"
+using namespace std;
+
+#ifdef WIN32
+int _tmain(int argc, _TCHAR* argv[])
+#else
+int main(int argc, char* argv[])
+#endif
+{
+	const int TEST_SET_COUNT = 10;
+	
+	TimeTravelStore store;
+	TimeTravelStore::key_info_t key_info;
+	char buf[512];
+	double time;
+
+	if (store.init("142.150.237.45") != 0) {
+		cerr << "Error initialize timetravelstore" << endl;
+		return 1;
+	}
+	store.delete_key("key2");
+	if (store.create_key("key2", 0) != 0) {
+		cerr << "Error calling create_key" << endl;
+		return 1;
+	}
+	if (store.get_key_info("key2", &key_info) != 0) {
+		cerr << "Error calling get_key_info" << endl;
+		return 1;
+	}
+	if (key_info.create_count != 1) {
+	      cerr << "Error create_count " << key_info.create_count << " should have been 1" << endl;
+	      return 1;
+	}
+	for (int i = 0; i < TEST_SET_COUNT; i++) {
+	    sprintf(buf, "data%d", i);
+	    if (store.set_value("key2", buf, i * 2) != 0) {
+		    cerr << "Error calling set_value" << endl;
+		    return 1;
+	    }
+	}
+	if (store.get_key_info("key2", &key_info) != 0) {
+		cerr << "Error calling get_key_info" << endl;
+		return 1;
+	}
+	if (key_info.set_count != TEST_SET_COUNT) {
+		cerr << "Error set_count " << key_info.set_count << " should have been " << TEST_SET_COUNT << endl;
+		return 1;
+	}
+	if (store.get_value("key2", -1, buf, &time) != 0) {
+		    cerr << "Error calling set_value" << endl;
+		    return 1;
+	}
+	cout << "latest: " << buf << " @ " << time << endl;
+	for (int i = 0; i < TEST_SET_COUNT; i++) {
+	    if (store.get_value("key2", i, buf, &time) != 0) {
+		    cerr << "Error calling set_value" << endl;
+		    return 1;
+	    } else
+	      cout << i << ": " << buf << " @ " << time << endl;
+	}
+	return 0;
+}
+

@@ -1,0 +1,98 @@
+// testtimetravelstore.cpp : Defines the entry point for the console application.
+//
+
+#ifdef WIN32
+#include "stdafx.h"
+#endif
+#include <stdio.h>
+#include <iostream>
+#include "../timetravelstore/timetravelstore.h"
+using namespace std;
+
+int main(int argc, char* argv[])
+{
+	const int TEST_SET_COUNT = 10;
+	
+	TimeTravelStore store;
+	TimeTravelStore::key_info_t key_info;
+	char buf[512];
+	double time;
+	char *host = "127.0.0.1";
+	char key[512];
+
+	if (argc > 2)
+		host = argv[1];
+	if (store.init(host) != 0) {
+		cerr << "Error initialize timetravelstore" << endl;
+		return 1;
+	}
+	strcpy(key, "key2");
+	store.delete_key(key, 0, 1);
+	if (store.create_key(key, 0, 1) != 0) {
+		cerr << "Error calling create_key" << endl;
+		return 1;
+	}
+	if (store.get_key_info(key, &key_info) != 0) {
+		cerr << "Error calling get_key_info" << endl;
+		return 1;
+	}
+	if (key_info.create_count != 1) {
+	      cerr << "Error create_count " << key_info.create_count << " should have been 1" << endl;
+	      return 1;
+	}
+#if 1
+	for (int i = 0; i < TEST_SET_COUNT; i++) {
+	    sprintf(buf, "data%d", i);
+	    if (store.set_value(key, buf, strlen(buf) + 1, TEST_SET_COUNT - i, i * 2) != 0) {
+		    cerr << "Error calling set_value" << endl;
+		    return 1;
+	    }
+	}
+	if (store.get_key_info(key, &key_info) != 0) {
+		cerr << "Error calling get_key_info" << endl;
+		return 1;
+	}
+	if (key_info.set_count != TEST_SET_COUNT) {
+		cerr << "Error set_count " << key_info.set_count << " should have been " << TEST_SET_COUNT << endl;
+		return 1;
+	}
+	if (store.get_value(key, -1, buf, NULL, NULL, &time) != 0) {
+		    cerr << "Error calling set_value" << endl;
+		    return 1;
+	}
+	cout << "latest: " << buf << " @ " << time << endl;
+	for (int i = 0; i < TEST_SET_COUNT; i++) {
+		int type;
+		int len;
+	    if (store.get_value(key, i, buf, &len, &type, &time) != 0) {
+		    cerr << "Error calling set_value" << endl;
+		    return 1;
+	    } else
+	      cout << i << ": " << buf << " (len=" << len << ", type=" << type << ") @ " << time << endl;
+	}
+#endif
+	// test binary value
+	strcpy(key, "key 2");
+	store.delete_key(key, 0, 1);
+	if (store.create_key(key, 0, 1) != 0) {
+		cerr << "Error calling create_key" << endl;
+		return 1;
+	}
+	for (int i = 0; i < TEST_SET_COUNT; i++) {
+	    if (store.set_value(key, (const char *)&i, sizeof(i), i + 1, i * 3) != 0) {
+		    cerr << "Error calling set_value" << endl;
+		    return 1;
+	    }
+	}
+	for (int i = 0; i < TEST_SET_COUNT; i++) {
+		int type;
+		int value;
+		int len;
+	    if (store.get_value(key, i, (char *)&value, &len, &type, &time) != 0) {
+		    cerr << "Error calling set_value" << endl;
+		    return 1;
+	    } else
+	      cout << i << ": " << value << " (len=" << len << ",type=" << type << ") @ " << time << endl;
+	}
+	return 0;
+}

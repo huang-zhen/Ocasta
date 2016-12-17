@@ -1,0 +1,14 @@
+~/Tools/redis/stopredis
+~/Tools/redis/startredis test &
+sleep 2
+./testtimetravelstore
+err=$?
+#echo err=$err
+~/Tools/redis/stopredis
+if [ $err -ne 0 ]; then
+	echo "Test of timetravelstore failed"
+else
+	echo "Test of timetravelstore passed"
+fi
+exit $err
+
