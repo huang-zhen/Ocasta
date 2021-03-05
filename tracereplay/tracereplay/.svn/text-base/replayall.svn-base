@@ -1,0 +1,16 @@
+if [ $# -le 1 ]; then
+	echo "usage: replayall tracename file1 file2 ... "
+	exit
+fi
+trace=$1
+`date > $trace.stat`
+echo "starting " >> $trace.stat
+shift
+for file in $*
+do
+	echo "`date` tracereplay $trace $file" >> $trace.stat
+	tracereplay $trace $file
+done
+echo "finished " >> $trace.stat
+`date >> $trace.stat`
+
