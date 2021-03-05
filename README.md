@@ -1,5 +1,5 @@
 # Ocasta
-This project consists of the tools to replay traces on Linux system calls, Windows API calls and gconf API calls, a versioning key-value database, utilities for versioning files, and the monitor to collect traces on Linux and Windows.
+This project consists of the tools to replay traces on Linux system calls, Windows API calls and gconf API calls, the implementation of a versioning key-value database, utilities for versioning files, and the monitor to collect traces on Linux and Windows.
 
 The monitor for Linux system calls, kernel_logger, is implemented as a kernel module that modifies the system call table in Linux kernel to intercept system calls. It not only collects miscellaneous information on system calls such as timestamps, process id, and the type of system calls, but also can be configured to collect the actual data passed to system calls such as data being written to files, which can be used to implement or reconstruct a versioing file system.
 
